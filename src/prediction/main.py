@@ -193,15 +193,17 @@ def save_predictions(df: pd.DataFrame, project_id: str, destination_table: str):
     """Saves predictions to BigQuery with contract_type."""
     logging.info("Saving %d predictions to %s", len(df), destination_table)
     
-    # Output columns
-    out_df = df[["ticker", "date", "close", "prob", "contract_type", "prediction"]].copy()
+    # Output columns - Added atrr_14 for validation
+    out_df = df[["ticker", "date", "close", "atrr_14", "prob", "contract_type", "prediction"]].copy()
     
+    # Use WRITE_APPEND to build history instead of overwriting
     job_config = bigquery.LoadJobConfig(
-        write_disposition="WRITE_TRUNCATE", 
+        write_disposition="WRITE_APPEND", 
         schema=[
             bigquery.SchemaField("ticker", "STRING"),
             bigquery.SchemaField("date", "DATE"),
             bigquery.SchemaField("close", "FLOAT64"),
+            bigquery.SchemaField("atrr_14", "FLOAT64"),
             bigquery.SchemaField("prob", "FLOAT64"),
             bigquery.SchemaField("contract_type", "STRING"),
             bigquery.SchemaField("prediction", "INTEGER"), # 1 if > threshold, 0 otherwise
@@ -261,12 +263,11 @@ def main():
             # Mark strict sniper prediction
             dir_df["prediction"] = (probs > threshold).astype(int)
             
-            # Take Top 10 by probability, regardless of threshold
-            # (Users want to see the best available, even if confidence is lower than ideal)
-            top_10_df = dir_df.sort_values("prob", ascending=False).head(10).copy()
+            # Take Top 5 by probability
+            top_5_df = dir_df.sort_values("prob", ascending=False).head(5).copy()
             
-            logging.info("Direction %s: Selected top %d tickers.", direction, len(top_10_df))
-            all_predictions.append(top_10_df)
+            logging.info("Direction %s: Selected top %d tickers.", direction, len(top_5_df))
+            all_predictions.append(top_5_df)
             
         except Exception as e:
             logging.error("Failed to process %s model: %s", direction, e)
@@ -279,7 +280,7 @@ def main():
     # 3. Consolidate & Save
     final_df = pd.concat(all_predictions)
     
-    # Sort by probability descending to show best setups at top (mixed Calls and Puts)
+    # Sort by probability descending
     final_df.sort_values("prob", ascending=False, inplace=True)
     
     save_predictions(final_df, args.project_id, args.destination_table)

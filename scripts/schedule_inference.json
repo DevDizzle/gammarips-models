@@ -13,7 +13,8 @@
             "project": "profitscout-lx6bb",
             "source_table": "profit_scout.price_data",
             "destination_table": "profit_scout.daily_predictions",
-            "model_dir": "gs://profitscout-lx6bb-pipeline-artifacts/production/model"
+            "performance_table": "profit_scout.prediction_performance",
+            "model_base_dir": "gs://profitscout-lx6bb-pipeline-artifacts/production/model"
         }
       }
     }

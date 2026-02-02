@@ -1,6 +1,6 @@
-# ProfitScout: High Gamma Trading System
+# GammaRips: High Gamma Trading System
 
-ProfitScout is an autonomous machine learning system designed to identify stocks poised for **explosive, short-term price moves** (High Gamma). Unlike traditional "trend following" systems, it ignores slow movers and specifically targets volatility velocity.
+GammaRips is an autonomous machine learning system designed to identify stocks poised for **explosive, short-term price moves** (High Gamma). Unlike traditional "trend following" systems, it ignores slow movers and specifically targets volatility velocity.
 
 **Target:** `(Next_Day_Close - Close) > 0.5 * ATR(14)`  
 **Philosophy:** "Buy Volatility, Sell Velocity."
@@ -9,14 +9,14 @@ ProfitScout is an autonomous machine learning system designed to identify stocks
 
 ## 🎯 The "Sniper" Methodology
 
-The core innovation of ProfitScout is its **Dynamic Thresholding** system. Most models choke on market noise because they force a prediction for every stock, every day. ProfitScout operates differently:
+The core innovation of GammaRips is its **Dynamic Thresholding** system. Most models choke on market noise because they force a prediction for every stock, every day. GammaRips operates differently:
 
 1.  **Strict Filtering:** The model is trained to recognize the "perfect setup."
 2.  **The "Top 1%" Rule:** During training, we calculate the probability threshold required to be in the **Top 100** highest-confidence historical trades.
     *   *Current Threshold:* **0.814** (81.4% Confidence)
 3.  **Actionable Precision:**
     *   **Baseline Precision (Random Guess):** ~12%
-    *   **ProfitScout Precision (at Threshold):** **~36%**
+    *   **GammaRips Precision (at Threshold):** **~36%**
     *   *Implication:* When the model pulls the trigger, the odds of a massive (>0.5 ATR) move trip by **3x**.
 
 ### The "Daily Picks"

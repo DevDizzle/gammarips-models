@@ -18,10 +18,13 @@ PIPELINE_ROOT = f"gs://{PROJECT_ID}-pipeline-artifacts/inference"
 PREDICTOR_IMAGE_URI = (
     f"us-central1-docker.pkg.dev/{PROJECT_ID}/profit-scout-repo/profitscout-predictor:latest"
 )
+EVALUATOR_IMAGE_URI = (
+    f"us-central1-docker.pkg.dev/{PROJECT_ID}/profit-scout-repo/profitscout-evaluator:latest"
+)
 # Note: Inference doesn't typically output a model artifact, but CustomJob reqs a base_output_dir
 BASE_OUTPUT_DIR = f"{PIPELINE_ROOT}/job-output"
 
-# ───────────────── Component ─────────────────
+# ───────────────── Components ─────────────────
 @dsl.container_component
 def prediction_task(
     project: str,
@@ -40,9 +43,25 @@ def prediction_task(
         ],
     )
 
+@dsl.container_component
+def evaluation_task(
+    project: str,
+    predictions_table: str,
+    price_table: str,
+    performance_table: str,
+) -> dsl.ContainerSpec:
+    return dsl.ContainerSpec(
+        image=EVALUATOR_IMAGE_URI,
+        command=["python3", "main.py"],
+        args=[
+            "--project-id", project,
+            "--predictions-table", predictions_table,
+            "--price-table", price_table,
+            "--performance-table", performance_table,
+        ],
+    )
+
 # Using create_custom_training_job_from_component allows us to run this as a "Custom Job"
-# even though it's inference. This is often cheaper/simpler than BatchPredictionJob 
-# if we have custom logic (like feature engineering inside the container).
 prediction_op = create_custom_training_job_from_component(
     component_spec=prediction_task,
     display_name="profitscout-batch-prediction",
@@ -51,24 +70,42 @@ prediction_op = create_custom_training_job_from_component(
     base_output_directory=BASE_OUTPUT_DIR,
 )
 
+evaluation_op = create_custom_training_job_from_component(
+    component_spec=evaluation_task,
+    display_name="profitscout-prediction-evaluation",
+    machine_type="n1-standard-4", # Lighter machine needed for SQL checks
+    replica_count=1,
+    base_output_directory=BASE_OUTPUT_DIR,
+)
+
 # ───────────────── Pipeline ─────────────────
 @dsl.pipeline(
     name="profitscout-daily-prediction-pipeline",
-    description="Generate High Gamma predictions for all tickers.",
+    description="Generate High Gamma predictions and evaluate past performance.",
     pipeline_root=PIPELINE_ROOT,
 )
 def inference_pipeline(
     project: str = PROJECT_ID,
     source_table: str = "profit_scout.price_data",
     destination_table: str = "profit_scout.daily_predictions",
+    performance_table: str = "profit_scout.prediction_performance",
     model_base_dir: str = "gs://profitscout-lx6bb-pipeline-artifacts/production/model", 
 ):
-    prediction_op(
+    pred_step = prediction_op(
         project=project,
         source_table=source_table,
         destination_table=destination_table,
         model_base_dir=model_base_dir,
     )
+    
+    # Run evaluation after prediction (conceptually verifies YESTERDAY's predictions using TODAY's data)
+    # We pass 'destination_table' as the 'predictions_table' to read from.
+    eval_step = evaluation_op(
+        project=project,
+        predictions_table=destination_table,
+        price_table=source_table,
+        performance_table=performance_table,
+    ).after(pred_step)
 
 # ───────────────── Compile and Upload ─────────────────
 if __name__ == "__main__":
