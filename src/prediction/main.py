@@ -252,11 +252,23 @@ def main():
             threshold = load_threshold(model_path)
             logging.info("Loaded %s model. Threshold: %f", direction, threshold)
             
-            dmatrix = xgb.DMatrix(feat_df[FEATURE_NAMES])
+            if direction == "LONG":
+                mask_roc = feat_df["roc_3"] <= 12.0
+                mask_macd = feat_df["macdh_12_26_9"] > 0
+                mask_close = ~((feat_df["close_loc"] >= 0.85) & (feat_df["volume_delta"] > 1.0))
+                dir_df = feat_df[mask_roc & mask_macd & mask_close].copy()
+                logging.info("Applied bullish filters. Rows remaining: %d", len(dir_df))
+            else:
+                dir_df = feat_df.copy()
+                
+            if dir_df.empty:
+                logging.warning("No candidates after filtering for %s.", direction)
+                continue
+            
+            dmatrix = xgb.DMatrix(dir_df[FEATURE_NAMES])
             probs = bst.predict(dmatrix)
             
             # Create a view for this direction
-            dir_df = feat_df.copy()
             dir_df["prob"] = probs
             dir_df["contract_type"] = contract_type
             

@@ -184,6 +184,13 @@ def engineer_features(df: pd.DataFrame, direction: str = "LONG") -> pd.DataFrame
     # We drop because indicators need warmup
     full_df.dropna(subset=FEATURE_NAMES + ["target"], inplace=True)
     
+    if direction == "LONG":
+        mask_roc = full_df["roc_3"] <= 12.0
+        mask_macd = full_df["macdh_12_26_9"] > 0
+        mask_close = ~((full_df["close_loc"] >= 0.85) & (full_df["volume_delta"] > 1.0))
+        full_df = full_df[mask_roc & mask_macd & mask_close].copy()
+        logging.info("Applied bullish filters. Rows remaining: %d", len(full_df))
+    
     return full_df
 
 def validate_data(X, y, name="dataset"):
